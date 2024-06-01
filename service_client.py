@@ -1,10 +1,10 @@
 import logging
-from typing import List
+from typing import List, Optional, Dict
 
 import httpx
 
 
-class ClusterApi:
+class ClusterApiClient:
     def __init__(self, hosts: List[str], logger: logging.Logger):
         # Use dependency injection to inject required dependencies
         self.hosts = hosts
@@ -19,12 +19,12 @@ class ClusterApi:
                     if response.status_code == 201:
                         succeeded_hosts.append(host)
                     elif response.status_code == 400:
-                        raise httpx.HTTPError(f"Bad Request: Group {group_id} already exists on {host}")
+                        raise httpx.RequestError(f"Bad Request: Group {group_id} already exists on {host}")
                     elif response.status_code == 504:
-                        raise httpx.RequestError(f"Connection time out on {host}")
+                        raise httpx.TimeoutException(f"Connection time out on {host}")
                     else:
-                        raise httpx.HTTPError(f"Failed to create group: {response.status_code}")
-            except (httpx.RequestError, httpx.HTTPError) as error:
+                        response.raise_for_status()
+            except (httpx.RequestError, httpx.TimeoutException, httpx.HTTPError, httpx.HTTPStatusError) as error:
                 self.logger.warning(f"Error creating groups due to the {error} on host {host}")
                 await self._rollback_create(client, succeeded_hosts, group_id)
                 return False
@@ -39,16 +39,33 @@ class ClusterApi:
                     if response.status_code == 200:
                         succeeded_hosts.append(host)
                     elif response.status_code == 400:
-                        raise httpx.HTTPError(f"Bad Request: Group {group_id} not found on {host}")
+                        raise httpx.RequestError(f"Bad Request: Group {group_id} not found on {host}")
                     elif response.status_code == 504:
-                        raise httpx.RequestError(f"Connection time out on {host}")
+                        raise httpx.TimeoutException(f"Connection time out on {host}")
                     else:
-                        raise httpx.HTTPError(f"Failed to create group: {response.status_code}")
-            except (httpx.RequestError, httpx.HTTPError) as error:
+                        response.raise_for_status()
+            except (httpx.RequestError, httpx.TimeoutException, httpx.HTTPError, httpx.HTTPStatusError) as error:
                 self.logger.warning(f"Error deleting groups due to the {error} on host {host}")
                 await self._rollback_delete(client, succeeded_hosts, group_id)
                 return False
             return True
+
+    async def get_group(self, group_id: str) -> Optional[Dict[str, str]]:
+        async with httpx.AsyncClient() as client:
+            try:
+                for host in self.hosts:
+                    response = await client.get(f"https://{host}/v1/group/", params={"groupId": group_id})
+                    if response.status_code == 200:
+                        return response.json()
+                    elif response.status_code == 404:
+                        self.logger.info(f"Group {group_id} not found on {host}")
+                    else:
+                        self.logger.warning(f"Failed to fetch group {group_id} from {host} because of"
+                                            f" {response.status_code}")
+                        response.raise_for_status()
+            except (httpx.HTTPError, httpx.HTTPStatusError) as error:
+                self.logger.warning(f"Request error when fetching group {group_id} from {host}: {error}")
+        return None
 
     async def _rollback_create(self, client: httpx.AsyncClient, succeeded_hosts: List[str], group_id: str):
         for host in succeeded_hosts:
