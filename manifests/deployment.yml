@@ -1,0 +1,24 @@
+# deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-consumer
+  template:
+    metadata:
+      labels:
+        app: api-consumer
+    spec:
+      containers:
+      - name: api-consumer-container
+        image: api_consumer
+        env:
+          - name: CLUSTER_NODES
+            valueFrom:
+              configMapKeyRef:
+                name: api-client-config
+                key: CLUSTER_NODES
