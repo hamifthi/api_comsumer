@@ -23,8 +23,9 @@ class ClusterApiClient:
                     elif response.status_code == 504:
                         raise httpx.TimeoutException(f"Connection time out on {host}")
                     else:
-                        response.raise_for_status()
-            except (httpx.RequestError, httpx.TimeoutException, httpx.HTTPError, httpx.HTTPStatusError) as error:
+                        raise httpx.HTTPError(f"Create group: unexpected error happened on {host}"
+                                              f" with status code {response.status_code}")
+            except (httpx.RequestError, httpx.TimeoutException, httpx.HTTPError) as error:
                 self.logger.warning(f"Error creating groups due to the {error} on host {host}")
                 await self._rollback_create(client, succeeded_hosts, group_id)
                 return False
@@ -43,8 +44,9 @@ class ClusterApiClient:
                     elif response.status_code == 504:
                         raise httpx.TimeoutException(f"Connection time out on {host}")
                     else:
-                        response.raise_for_status()
-            except (httpx.RequestError, httpx.TimeoutException, httpx.HTTPError, httpx.HTTPStatusError) as error:
+                        raise httpx.HTTPError(f"Delete group: unexpected error happened on {host}"
+                                              f" with status code {response.status_code}")
+            except (httpx.RequestError, httpx.TimeoutException, httpx.HTTPError) as error:
                 self.logger.warning(f"Error deleting groups due to the {error} on host {host}")
                 await self._rollback_delete(client, succeeded_hosts, group_id)
                 return False
@@ -62,7 +64,6 @@ class ClusterApiClient:
                     else:
                         self.logger.warning(f"Failed to fetch group {group_id} from {host} because of"
                                             f" {response.status_code}")
-                        response.raise_for_status()
             except (httpx.HTTPError, httpx.HTTPStatusError) as error:
                 self.logger.warning(f"Request error when fetching group {group_id} from {host}: {error}")
         return None
