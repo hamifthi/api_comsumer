@@ -26,7 +26,7 @@ async def main():
     if group_info:
         logger.info(f"Group info: {group_info}")
     else:
-        logger.info("Group not found")
+        logger.warning("Group not found")
 
     # Delete group
     if await client.delete_group(group_id):

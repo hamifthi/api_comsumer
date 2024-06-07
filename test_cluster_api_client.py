@@ -52,6 +52,7 @@ async def test_create_group_connection_timeout(api_client):
 @pytest.mark.asyncio
 async def test_create_group_timeout(api_client):
     with patch('httpx.AsyncClient.post', new=AsyncMock(side_effect=httpx.TimeoutException("Connection time out"))):
+        api_client._post_with_retry.retry.sleep = AsyncMock()
         result = await api_client.create_group("test-group")
         assert result is False
 
@@ -87,6 +88,7 @@ async def test_delete_group_connection_timeout(api_client):
 @pytest.mark.asyncio
 async def test_delete_group_timeout(api_client):
     with patch('httpx.AsyncClient.delete', new=AsyncMock(side_effect=httpx.RequestError("Bad Request"))):
+        api_client._delete_with_retry.retry.sleep = AsyncMock()
         result = await api_client.delete_group("test-group")
         assert result is False
 

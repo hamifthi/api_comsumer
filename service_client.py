@@ -2,6 +2,7 @@ import logging
 from typing import List, Optional, Dict
 
 import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
 
 
 class ClusterApiClient:
@@ -10,12 +11,43 @@ class ClusterApiClient:
         self.hosts = hosts
         self.logger = logger
 
+    @retry(
+        stop=stop_after_attempt(6),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(httpx.RequestError),
+        before_sleep=before_sleep_log(logging.getLogger("tenacity.retry"), logging.WARNING),
+        reraise=True
+    )
+    async def _post_with_retry(self, client: httpx.AsyncClient, url: str, json: Dict):
+        return await client.post(url, json=json)
+
+    @retry(
+        stop=stop_after_attempt(6),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(httpx.RequestError),
+        before_sleep=before_sleep_log(logging.getLogger("tenacity.retry"), logging.WARNING),
+        reraise=True
+    )
+    async def _delete_with_retry(self, client: httpx.AsyncClient, url: str):
+        return await client.delete(url)
+
+    @retry(
+        stop=stop_after_attempt(6),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(httpx.RequestError),
+        before_sleep=before_sleep_log(logging.getLogger("tenacity.retry"), logging.WARNING),
+        reraise=True
+    )
+    async def _get_with_retry(self, client: httpx.AsyncClient, url: str):
+        return await client.get(url)
+
     async def create_group(self, group_id: str) -> bool:
         async with httpx.AsyncClient() as client:
             succeeded_hosts = []
             try:
                 for host in self.hosts:
-                    response = await client.post(f"https://{host}/v1/group/", json={"groupId": group_id})
+                    url = f"https://{host}/v1/group/"
+                    response = await self._post_with_retry(client, url, json={"groupId": group_id})
                     if response.status_code == 201:
                         succeeded_hosts.append(host)
                     elif response.status_code == 400:
@@ -36,7 +68,8 @@ class ClusterApiClient:
             succeeded_hosts = []
             try:
                 for host in self.hosts:
-                    response = await client.delete(f"https://{host}/v1/group/", params={"groupId": group_id})
+                    url = f"https://{host}/v1/group?groupId=group_id"
+                    response = await self._delete_with_retry(client, url)
                     if response.status_code == 200:
                         succeeded_hosts.append(host)
                     elif response.status_code == 400:
@@ -56,7 +89,8 @@ class ClusterApiClient:
         async with httpx.AsyncClient() as client:
             try:
                 for host in self.hosts:
-                    response = await client.get(f"https://{host}/v1/group/", params={"groupId": group_id})
+                    url = f"https://{host}/v1/group?groupId=group_id"
+                    response = await self._get_with_retry(client, url)
                     if response.status_code == 200:
                         return response.json()
                     elif response.status_code == 404:
