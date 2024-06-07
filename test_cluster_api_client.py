@@ -3,7 +3,6 @@ import httpx
 import os
 import logging
 from httpx import Response
-from dotenv import load_dotenv
 from unittest.mock import patch, AsyncMock
 from service_client import ClusterApiClient
 
@@ -13,7 +12,6 @@ pytest_plugins = ('pytest_asyncio',)
 
 @pytest.fixture
 def hosts():
-    load_dotenv()
     return os.getenv("CLUSTER_NODES").split(",")
 
 

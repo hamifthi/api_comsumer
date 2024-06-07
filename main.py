@@ -1,13 +1,10 @@
 import asyncio
 import os
 
-from dotenv import load_dotenv
-
 from logging_config import setup_logging
 from service_client import ClusterApiClient
 
 
-load_dotenv()
 logger = setup_logging()
 
 
