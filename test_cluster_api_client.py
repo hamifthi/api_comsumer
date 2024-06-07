@@ -18,7 +18,7 @@ def hosts():
 @pytest.fixture
 def logger():
     logging.basicConfig(level=logging.DEBUG)
-    return logging.getLogger("ClusterApiClient")
+    return logging.getLogger("ClusterApiClientTest")
 
 
 @pytest.fixture
